@@ -71,10 +71,12 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     default_random_engine gen;
 
     for (int i = 0; i < num_particles; i++) {
+        //For current particle
         double particle_current_x = particles[i].x;
         double particle_current_y = particles[i].y;
         double particle_current_theta = particles[i].theta;
 
+        //For predicted particle
         double particle_predict_x = 0.0;
         double particle_predict_y = 0.0;
         double particle_predict_theta = 0.0;
@@ -84,7 +86,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
             particle_predict_x = particle_current_x + velocity * cos(particle_current_theta) * delta_t;
             particle_predict_y = particle_current_y + velocity * sin(particle_current_theta) * delta_t;
             particle_predict_theta = particle_current_theta;
-        } else {
+        }
+        else {
             particle_predict_x = particle_current_x +
                     (velocity / yaw_rate) * (sin(particle_current_theta + (yaw_rate * delta_t)) - sin(particle_current_theta));
             particle_predict_y = particle_current_y +
