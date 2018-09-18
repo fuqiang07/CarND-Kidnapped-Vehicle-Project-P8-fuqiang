@@ -195,9 +195,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             LandmarkObs lm;
             Map::single_landmark_s current_landmark = map_landmarks.landmark_list[j];
 
-            lm.x = map_landmarks.landmark_list[j].x_f;
-            lm.y = map_landmarks.landmark_list[j].y_f;
-            lm.id = map_landmarks.landmark_list[j].id_i;
+            lm.x = current_landmark.x_f;
+            lm.y = current_landmark.y_f;
+            lm.id = current_landmark.id_i;
 
             //we use a rectangular region rather then circular region considering the computation speed
             if (fabs(lm.x - particle_x) <= sensor_range && fabs(lm.y - particle_y) <= sensor_range) {
@@ -210,7 +210,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
           2.2 Perform data association using nearest neighborhood method
          **/
          //After this step, id in vector of observations_tranformed will be updated
-        dataAssociation(landmarks_predicted, observations_tranformed);
+        dataAssociation(landmarks_predicted, observations_tranformed, sensor_range);
 
         /*****************************************************************************
         * Step 3: Update weight wieh multivariate-Gaussian probability
@@ -221,9 +221,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
         double sigma_y = std_landmark[1];
         //Calculate normalization term
         double gauss_norm = (1/(2 * M_PI * sigma_x * sigma_y));
-
-
-
 
         //Re-init weight of particles
         particles[i].weight = 1.0;
@@ -301,9 +298,16 @@ Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<i
     // sense_x: the associations x mapping already converted to world coordinates
     // sense_y: the associations y mapping already converted to world coordinates
 
-    particle.associations= associations;
+    //Clear the previous associations
+    particle.associations.clear();
+    particle.sense_x.clear();
+    particle.sense_y.clear();
+
+    particle.associations = associations;
     particle.sense_x = sense_x;
     particle.sense_y = sense_y;
+
+    return particle;
 }
 
 string ParticleFilter::getAssociations(Particle best)
