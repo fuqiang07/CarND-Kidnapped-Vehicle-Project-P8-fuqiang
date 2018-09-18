@@ -154,6 +154,108 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+
+    // for each particle...
+    for (int i = 0; i < num_particles; i++) {
+
+        //Get x, y, theta coordinates of a particle based on the vehicle coordinates
+        double particle_x = particles[i].x;
+        double particle_y = particles[i].y;
+        double particle_theta = particles[i].theta;
+
+        /*****************************************************************************
+        * Step 1: Transform observations from vehicle coordinates to map coordinates
+        ****************************************************************************/
+
+        //Create a vector to keep transformed observations
+        vector<LandmarkObs> observations_tranformed;
+
+        for (size_t j = 0; j < observations.size(); j++) {
+            LandmarkObs obs;
+
+            obs.id = observations[j].id;
+            obs.x = particle_x +
+                    cos(particle_theta) * observations[j].x - sin(particle_theta) * observations[j].y;
+            obs.y = particle_y +
+                    sin(particle_theta) * observations[j].x + cos(particle_theta) * observations[j].y;
+            observations_tranformed.push_back(obs);
+        }
+
+        /*****************************************************************************
+        * Step 2: Associate data with nearest neighbourhood method
+        ****************************************************************************/
+
+        /**
+         2.1 Keep data within sensor_range
+        **/
+        //Create a vector to keep predictions within sensor range
+        vector<LandmarkObs> landmarks_predicted;
+
+        for (size_t j = 0; j < map_landmarks.landmark_list.size(); j++) {
+            LandmarkObs lm;
+            Map::single_landmark_s current_landmark = map_landmarks.landmark_list[j];
+
+            lm.x = map_landmarks.landmark_list[j].x_f;
+            lm.y = map_landmarks.landmark_list[j].y_f;
+            lm.id = map_landmarks.landmark_list[j].id_i;
+
+            //we use a rectangular region rather then circular region considering the computation speed
+            if (fabs(lm.x - particle_x) <= sensor_range && fabs(lm.y - particle_y) <= sensor_range) {
+                // add prediction to vector
+                landmarks_predicted.push_back(lm);
+            }
+        }
+
+        /**
+          2.2 Perform data association using nearest neighborhood method
+         **/
+         //After this step, id in vector of observations_tranformed will be updated
+        dataAssociation(landmarks_predicted, observations_tranformed);
+
+        /*****************************************************************************
+        * Step 3: Update weight wieh multivariate-Gaussian probability
+        ****************************************************************************/
+
+        //Define inputs to Gaussian probability
+        double sigma_x = std_landmark[0];
+        double sigma_y = std_landmark[1];
+        //Calculate normalization term
+        double gauss_norm = (1/(2 * M_PI * sigma_x * sigma_y));
+
+
+
+
+        //Re-init weight of particles
+        particles[i].weight = 1.0;
+
+        for (size_t j = 0; j < observations_tranformed.size(); j++) {
+
+            //Get observation coordinates and id
+            double obs_x = observations_tranformed[j].x;
+            double obs_y = observations_tranformed[j].y;
+            int obs_id = observations_tranformed[j].id;
+
+            //Get the x,y coordinates of the prediction associated with the current observation
+            for (size_t k = 0; k < landmarks_predicted.size(); k++) {
+                //Get prediction coordinates and id
+                double pred_x = landmarks_predicted[k].x;
+                double pred_y = landmarks_predicted[k].y;
+                int pred_id = landmarks_predicted[k].id;
+
+                if (pred_id == obs_id) {
+                    //Calculate exponent
+                    double exponent = (pow(obs_x - pred_x, 2))/(2 * pow(sigma_x, 2))
+                            + (pow(obs_y - pred_y, 2))/(2 * pow(sigma_y, 2));
+                    //Calculate weight using normalization terms and exponent
+                    double weight = gauss_norm * exp(-exponent);
+                    //Calculate particle's final weight
+                    particles[i].weight *= weight;
+                }
+            }
+        }
+        //Update weights
+        weights[i] = particles[i].weight;
+    }
 }
 
 void ParticleFilter::resample() {
@@ -161,6 +263,34 @@ void ParticleFilter::resample() {
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
+	//Create a vector<Particle> to save resampled particles.
+    vector<Particle> particle_updated;
+
+    default_random_engine gen;
+
+    //Generate random particle indices
+    uniform_int_distribution<int> particles_index(0, num_particles-1);
+    int index = particles_index(gen);
+
+    //Get maximum weight
+    double weight_max = *max_element(weights.begin(), weights.end());
+
+    // uniform random distribution [0.0, max_weight)
+    uniform_real_distribution<double> distr_uniform(0.0, 2.0 * weight_max);
+
+    double beta = 0.0;
+
+    //Run the spinning wheel for re-sampling
+    for (int i = 0; i < num_particles; i++) {
+        beta += distr_uniform(gen);
+        while (beta > weights[index]) {
+            beta -= weights[index];
+            index = (index + 1) % num_particles;
+        }
+        particle_updated.push_back(particles[index]);
+    }
+
+    particles = particle_updated;
 }
 
 Particle ParticleFilter::SetAssociations(Particle& particle, const std::vector<int>& associations, 
