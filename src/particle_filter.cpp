@@ -55,11 +55,11 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
         p.weight = 1.0;
 
         // init Particles
-        Particle.push_back(p);
+        Particles.push_back(p);
         weights.push_back(p.weight);
     }
     // Flag, if filter is initialized
-    is_initialized = True;
+    is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
@@ -108,31 +108,36 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     }
 }
 
-void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
+void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted,
+        std::vector<LandmarkObs>& observations,
+        double sensor_range) {
 	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
 	//   observed measurement to this particular landmark.
 	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
 	//   implement this method and use it as a helper during the updateWeights phase.
 
     for (size_t i = 0; i < observations.size(); i++) {
-        //Maximum distance can be square root of 2 times the range of sensor.
-        double lowest_dist = sensor_range * sqrt(2);
-        int closest_landmark_id = -1;
-        double obs_x = observations[i].x;
-        double obs_y = observations[i].y;
+        //Init min distance to sqrt(2) times sensor_range. For those points that are out of this point, we
+        // don't need to consider
+        double min_dist = sensor_range * sqrt(2);
+        //Init the id of landmark associated to an observation
+        int landmark_id = -1;
+        //Get current observation
+        LandmarkObs o = observations[i];
 
         for (size_t j = 0; j < predicted.size(); j++) {
-            double pred_x = predicted[j].x;
-            double pred_y = predicted[j].y;
-            int pred_id = predicted[j].id;
-            double current_dist = dist(obs_x, obs_y, pred_x, pred_y);
+            //Get current prediction
+            LandmarkObs p = predicted[j];
 
-            if (current_dist < lowest_dist) {
-                lowest_dist = current_dist;
-                closest_landmark_id = pred_id;
+            //Get distance between current observation and predicted landmarks
+            double current_dist = dist(o.x, o.y, p.x, p.y);
+
+            if (current_dist < min_dist) {
+                min_dist = current_dist;
+                landmark_id = p.id;
             }
         }
-        observations[i].id = closest_landmark_id;
+        observations[i].id = landmark_id;
     }
 
 }
